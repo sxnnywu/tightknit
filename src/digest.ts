@@ -1,5 +1,6 @@
 import type { Digest, SlackMessage } from "./types";
 
+// Convert a Slack timestamp to microseconds, or return undefined if it is invalid.
 function timestamp(value: unknown): bigint | undefined {
   if (typeof value !== "string" || !/^\d+(?:\.\d{1,6})?$/.test(value)) return;
   const [seconds, fraction = ""] = value.split(".");
@@ -7,14 +8,9 @@ function timestamp(value: unknown): bigint | undefined {
 }
 
 /**
- * Build the weekly digest for one Slack channel.
+ * Return the week's busiest threads and unanswered questions for one channel.
  *
- * The interval includes weekStart and excludes weekStart + 7 days.
- * Rank up to three threads by weekly replies, then newest parent first.
- * Surface top-level human questions oldest first when reply_count is explicitly
- * zero OR no replies are observed anywhere in the export. Missing counts alone
- * do not override observed replies. Invalid records are ignored where unusable;
- * invalid arguments throw. Input messages are never modified.
+ * The week includes weekStart and ends just before the same time seven days later.
  */
 export function buildDigest(messages: SlackMessage[], weekStart: Date): Digest {
   if (!Array.isArray(messages)) throw new TypeError("messages must be an array");
@@ -42,7 +38,7 @@ export function buildDigest(messages: SlackMessage[], weekStart: Date): Digest {
 
     if (isReply) {
       const thread = message.thread_ts!;
-      // Even an undated or textless reply establishes a response overall.
+      // Record replies from all dates, including those with invalid timestamps.
       observedReplies.add(thread);
       if (time !== undefined && inWeek(time)) {
         weeklyReplies.set(thread, (weeklyReplies.get(thread) ?? 0) + 1);
